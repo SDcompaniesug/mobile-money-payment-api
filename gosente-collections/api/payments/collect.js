@@ -27,7 +27,10 @@ module.exports = async function handler(req, res) {
     return send(res, 202, { status: "pending", ref, amount: value, currency: "UGX", channel: provider.channel || "mobile_money", message: "Approve the mobile-money prompt. Payment access remains locked until server verification succeeds." });
   } catch (e) {
     console.error("collection initiation failed", e.message);
-    await db().query("UPDATE gosente_payments SET status='failed', updated_at=NOW() WHERE ref=$1 AND status='pending'", [ref]).catch(()=>{});
-    return send(res, 502, { error: "Could not initiate payment", ref });
+    // A network timeout can happen after the provider accepted the deposit. Keep it pending
+    // so a later server-side status lookup can safely resolve it; never unlock on this error.
+    await db().query("UPDATE gosente_payments SET provider_response=$2, updated_at=NOW() WHERE ref=$1 AND status='pending'",
+      [ref, JSON.stringify({ initiation_error: String(e.message || "unknown").slice(0, 300) })]).catch(()=>{});
+    return send(res, 502, { error: "Payment initiation could not be confirmed. Access remains locked; check this reference again before retrying.", ref, accessGranted: false });
   }
 };
