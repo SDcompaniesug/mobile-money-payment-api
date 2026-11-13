@@ -7,12 +7,13 @@ module.exports = async function handler(req, res) {
   if (!requireAppKey(req, res)) return;
   const { phone, email, amount, purpose } = req.body || {};
   const value = Number(amount);
-  if (!/^(\+?256|0)?[0-9]{9,10}$/.test(String(phone || "").replace(/[\\s-]/g, "")) ||
-      !email || !/^\\S+@\\S+\\.\\S+$/.test(String(email)) ||
+  const rawPhone = String(phone || "").replace(/[\s-]/g, "");
+  if (!/^(\+?256|0)?[0-9]{9,10}$/.test(rawPhone) ||
+      !email || !/^\S+@\S+\.\S+$/.test(String(email)) ||
       !Number.isSafeInteger(value) || value < 500 || value > 50000000) {
     return send(res, 400, { error: "Valid Uganda phone, email and amount (UGX 500–50,000,000) are required" });
   }
-  const normalizedPhone = String(phone).replace(/[\\s-]/g, "").replace(/^\\+/, "").replace(/^0/, "256");
+  const normalizedPhone = rawPhone.replace(/^\+/, "").replace(/^0/, "256");
   const ref = "GSC-" + randomUUID().replace(/-/g, "").toUpperCase();
   try {
     await ensureSchema();
